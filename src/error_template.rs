@@ -24,14 +24,12 @@ pub fn ErrorTemplate(
     #[prop(optional)] errors: Option<RwSignal<Errors>>,
 ) -> impl IntoView {
     let errors = match outside_errors {
-        Some(e) => create_rw_signal(e),
+        Some(e) => e,
         None => match errors {
-            Some(e) => e,
+            Some(e) => e.get_untracked(),
             None => panic!("No Errors found and we expected errors!"),
         },
     };
-    // Get Errors from Signal
-    let errors = errors.get_untracked();
 
     // Downcast lets us take a type that implements `std::error::Error`
     let errors: Vec<AppError> = errors
