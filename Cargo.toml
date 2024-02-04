@@ -20,16 +20,29 @@ wasm-bindgen = "=0.2.89"
 thiserror = "1"
 tracing = { version = "0.1", optional = true }
 http = "1"
-sqlx = "0.7.3"
+sqlx = { version = "0.7.3", features = [
+    "mysql",
+    "sqlite",
+    "runtime-tokio",
+    "tls-native-tls",
+    "macros",
+],  optional = true}
+toml = { version = "0.8.9", optional = true }
+serde = {version = "1.0.196", features = ["derive"], optional = true}
 
 [features]
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
+
+# If you get 'failed to resolve: use of undeclared crate or module' or 'unresolved import' try adding it here as a dep
 ssr = [
     "dep:axum",
     "dep:tokio",
     "dep:tower",
     "dep:tower-http",
     "dep:leptos_axum",
+    "dep:sqlx",
+    "dep:toml",
+    "dep:serde",
     "leptos/ssr",
     "leptos_meta/ssr",
     "leptos_router/ssr",
@@ -64,10 +77,10 @@ style-file = "style/main.scss"
 assets-dir = "public"
 
 # The IP and port (ex: 127.0.0.1:3000) where the server serves the content. Use it in your server setup.
-site-addr = "127.0.0.1:3000"
+site-addr = "127.0.0.1:3006"
 
 # The port to use for automatic reload monitoring
-reload-port = 3001
+reload-port = 3007
 
 # [Optional] Command to use when running end2end tests. It will run in the end2end dir.
 #   [Windows] for non-WSL use "npx.cmd playwright test"
