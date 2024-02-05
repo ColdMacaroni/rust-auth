@@ -1,0 +1,13 @@
+[database]
+url = "sqlite::memory:"
+
+[leptos]
+output-name = "rust-auth"
+site-root = "target/site"
+# site-pkg-dir = "pkg"
+# env = 
+# site-addr = "127.0.0.1:3002"
+# reload-port = 3007
+# reload-external-port = 
+# reload-ws-protocol = 
+# not-found-path = 
