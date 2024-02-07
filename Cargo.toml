@@ -29,6 +29,8 @@ sqlx = { version = "0.7.3", features = [
 ],  optional = true}
 toml = { version = "0.8.9", optional = true }
 serde = {version = "1.0.196", features = ["derive"], optional = true}
+axum_session = { version = "0.12.4", default-features = false, features = ["sqlite-native", "mysql-native", "sqlx"], optional = true }
+axum_session_auth = { version = "0.12.0", default-features = false, features = ["sqlite-native", "mysql-native"] }
 
 [features]
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
@@ -36,6 +38,7 @@ hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
 # If you get 'failed to resolve: use of undeclared crate or module' or 'unresolved import' try adding it here as a dep
 ssr = [
     "dep:axum",
+    "dep:axum_session",
     "dep:tokio",
     "dep:tower",
     "dep:tower-http",
