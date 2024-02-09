@@ -1,9 +1,11 @@
-use sqlx::{pool::PoolOptions, AnyPool};
+use sqlx::{ sqlite::SqlitePoolOptions, SqlitePool};
 use std::{fs::read_to_string, path::Path};
 
 use axum::extract::FromRef;
 use leptos::LeptosOptions;
 use serde::Deserialize;
+
+use crate::auth::AuthBackend;
 
 /// A... normal number of connections?
 fn default_max_connections() -> u32 {
@@ -29,7 +31,8 @@ pub struct Config {
 #[derive(FromRef, Clone, Debug)]
 pub struct AppState {
     pub config: Config,
-    pub pool: AnyPool,
+    pub pool: SqlitePool,
+    pub auth: AuthBackend,
 }
 
 // Must be implemented to be able to use this struct as the router state.
@@ -39,6 +42,7 @@ impl FromRef<AppState> for LeptosOptions {
         input.config.leptos.to_owned()
     }
 }
+
 
 /// Defines the struct that holds the global state.
 /// The server configuration is part of the state.
@@ -61,7 +65,7 @@ impl AppState {
 
         // Connect to database
         sqlx::any::install_default_drivers();
-        let pool: AnyPool = match PoolOptions::new()
+        let pool: SqlitePool = match SqlitePoolOptions::new()
             .max_connections(config.database.max_connections)
             .connect_lazy(&config.database.url)
         {
@@ -71,6 +75,8 @@ impl AppState {
             }
         };
 
-        Ok(AppState { config, pool })
+        let auth = AuthBackend { pool: pool.clone() };
+
+        Ok(AppState { config, pool, auth })
     }
 }

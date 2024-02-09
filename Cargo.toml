@@ -30,6 +30,7 @@ sqlx = { version = "0.7.3", features = [
 toml = { version = "0.8.9", optional = true }
 serde = {version = "1.0.196", features = ["derive"], optional = true}
 axum-login = "0.13.1"
+tower-sessions-sqlx-store = { version = "0.10.0", features = ["mysql", "sqlite"], optional = true }
 
 [features]
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
@@ -40,6 +41,7 @@ ssr = [
     "dep:tokio",
     "dep:tower",
     "dep:tower-http",
+    "dep:tower-sessions-sqlx-store",
     "dep:leptos_axum",
     "dep:sqlx",
     "dep:toml",

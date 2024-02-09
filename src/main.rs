@@ -14,7 +14,11 @@ async fn main() {
     // let addr = leptos_options.site_addr;
 
     use std::process::exit;
+    use axum_login::{tower_sessions::SessionManagerLayer, AuthManagerLayerBuilder};
+    use rust_auth::auth::AuthBackend;
+    use tower_sessions_sqlx_store::SqliteStore;
 
+    // Try and crate a state we can live with
     let state = match AppState::new(Path::new("config.toml")) {
         Ok(v) => v,
         Err(err) => {
@@ -23,8 +27,16 @@ async fn main() {
             exit(1);
         }
     };
-    let addr = state.config.leptos.site_addr;
 
+    // The session needs a place to store the user cookies and such
+    // Pool is behind an Arc so ok to clone
+    let session_store = SqliteStore::new(state.pool.clone());
+
+    // Requests get passed through this layer, pressumably to ensure they've got the cookies and
+    // stuff.
+    let session_layer = SessionManagerLayer::new(session_store);
+
+    let addr = state.config.leptos.site_addr;
     let routes = generate_route_list(App);
 
     // build our application with a route
