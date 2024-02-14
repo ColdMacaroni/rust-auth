@@ -1,4 +1,24 @@
 body {
-	font-family: sans-serif;
-	text-align: center;
+  font-family: sans-serif;
+  text-align: center;
+}
+
+.credential-form {
+  margin: 0 auto;
+  display: grid;
+
+  width: fit-content;
+  gap: 10px;
+  align-items: left;;
+
+  label {
+      width: 100%;
+      text-align: left;
+      margin-top: 5px;
+  }
+
+  input[type="submit"] {
+      width: fit-content;
+      margin: 0 auto;
+  }
 }

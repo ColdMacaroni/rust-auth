@@ -18,7 +18,7 @@ async fn main() {
     // let addr = leptos_options.site_addr;
 
     use axum::routing::get;
-    use axum_login::tower_sessions::SessionManagerLayer;
+    use axum_login::{tower_sessions::SessionManagerLayer, AuthManagerLayerBuilder};
     use leptos::server_fn::axum::server_fn_paths;
     use std::process::exit;
     use tower_sessions_sqlx_store::SqliteStore;
@@ -40,6 +40,7 @@ async fn main() {
     // Requests get passed through this layer, pressumably to ensure they've got the cookies and
     // stuff.
     let session_layer = SessionManagerLayer::new(session_store);
+    let auth_layer = AuthManagerLayerBuilder::new(state.auth.clone(), session_layer).build();
 
     let addr = state.config.leptos.site_addr;
     let routes = generate_route_list(App);
@@ -56,7 +57,7 @@ async fn main() {
         .leptos_routes_with_handler(routes, get(leptos_routes_handler))
         // .leptos_routes(&state, routes, App)
         .fallback(file_and_error_handler)
-        .layer(session_layer)
+        .layer(auth_layer)
         .with_state(dbg!(state));
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
