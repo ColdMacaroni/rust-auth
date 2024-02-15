@@ -48,7 +48,7 @@ fn HomePage() -> impl IntoView {
 
         <A href="/login"> "Login" </A>
         <br />
-        <A href="/signup"> "Signup" </A>
+        <A href="/signup"> "Sign Up" </A>
 
         <p>Wanna visit the secret page?</p>
         <A href="/secret">Click here</A>
