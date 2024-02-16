@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use crate::error_template::{AppError, ErrorTemplate};
-use axum_login::AuthnBackend;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -65,26 +64,61 @@ fn LogIn() -> impl IntoView {
 
 #[server(SignUpDetails)]
 async fn sign_up(username: String, password: String) -> Result<(), ServerFnError> {
-    use crate::state::AppState;
+    use crate::auth;
+    use rand::random;
     use crate::auth::Credentials;
+    use crate::state::AppState;
+    use bcrypt::hash_with_salt;
 
+
+    /* // Mess with timing attacks
+    tokio::time::sleep(Duration::from_nanos(
+        2000000000 + (random::<u64>() % 3000000000),
+    ))
+    .await; */
+
+    // TODO: Change this to expect context.
     let Some(state) = use_context::<AppState>() else {
         return Err(ServerFnError::ServerError(
             "Couldn't receive state from context".to_owned(),
         ));
     };
 
-    let username = username.to_lowercase().trim().to_string();
-    let pw_hash = todo!("bcrypt the hash");
+    // TODO: Validate password and username.
 
-    println!("Received {username:?}, {password:?}");
+    let username = username.trim().to_lowercase().to_string();
 
-    let auth = state.auth.authenticate(Credentials { username, pw_hash });
-    tokio::time::sleep(todo!("Random sleep")).await;
+    let user_exists = sqlx::query("SELECT id FROM user WHERE username = ?")
+        .bind(&username)
+        .fetch_optional(&state.pool)
+        .await?
+        .is_some();
 
-    // tokio::time::sleep(Duration::from_secs(3)).await;
+    if user_exists {
+        return Err(ServerFnError::ServerError("User already exists".to_owned()));
+    }
 
-    leptos_axum::redirect("/");
+    let pw_hash = hash_with_salt(password, auth::BCRYPT_COST, rand::random()).unwrap();
+
+    println!("Received {username:?}, {pw_hash:?}");
+    println!("{:?}", pw_hash.to_string());
+
+    println!("Registering {username:?}, {pw_hash:?}");
+
+    sqlx::query("INSERT INTO user (username, password_hash, salt) VALUES (?, ?, ?)")
+        .bind(username)
+        .bind(pw_hash.to_string())
+        .bind(pw_hash.get_salt())
+        .execute(&state.pool).await?;
+
+    // TODO: Figure out how to.. log the user in lmao
+
+    // let auth = state.auth.authenticate(Credentials {
+    //     username,
+    //     pw_hash: pw_hash.to_string(),
+    // });
+
+    // leptos_axum::redirect("/");
     Ok(())
 }
 

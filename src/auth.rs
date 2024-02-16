@@ -4,6 +4,8 @@ use axum_login::{AuthUser, AuthnBackend};
 use sqlx::{Executor, Row, SqlitePool};
 use std::fmt::Debug;
 
+pub const BCRYPT_COST: u32 = 12;
+
 // Could have more fields, and be able to be constructed From an sqlx row.
 // Actually is it ok to clone if it has that many fields? Might want to keep a smaller substruct
 // for this if that's a concern.
@@ -42,7 +44,7 @@ impl Debug for User {
 #[derive(Clone)]
 pub struct Credentials {
     pub username: String,
-    pub pw_hash: Vec<u8>,
+    pub pw_hash: String,
 }
 
 // Needed for the AuthUser trait

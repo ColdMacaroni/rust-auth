@@ -33,6 +33,9 @@ async fn main() {
         }
     };
 
+
+    sqlx::migrate!().run(&state.pool).await.expect("Migrations to run correctly");
+
     // The session needs a place to store the user cookies and such
     // Pool is behind an Arc so ok to clone
     let session_store = SqliteStore::new(state.pool.clone());
