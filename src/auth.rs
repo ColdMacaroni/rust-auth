@@ -41,6 +41,7 @@ impl Debug for User {
     }
 }
 
+// TODO: Any way to do it by reference?
 #[derive(Clone)]
 pub struct Credentials {
     pub username: String,
@@ -75,17 +76,20 @@ impl AuthnBackend for AuthBackend {
 
     async fn authenticate(
         &self,
-        _creds: Self::Credentials,
+        creds: Self::Credentials,
     ) -> Result<Option<Self::User>, Self::Error> {
         // sqlx::query("SELECT * FROM user WHERE username = ? AND password_hash = ?")
         // .execute(&self.pool).await?;
 
-        let row = self
-            .pool
-            .fetch_one("SELECT * FROM user WHERE username = ? AND password_hash = ?")
+        let row = sqlx::query("SELECT * FROM user WHERE username = ? AND password_hash = ?")
+            .bind(creds.username)
+            .bind(creds.pw_hash)
+            .fetch_optional(&self.pool)
             .await?;
 
-        println!("[authenticate] Received row: {:#?}", row.columns());
+        if let Some(row) = row {
+            println!("[authenticate] Received row: {:#?}", row.columns());
+        }
 
         Ok(None)
     }
@@ -96,3 +100,4 @@ impl AuthnBackend for AuthBackend {
         Ok(None)
     }
 }
+pub type AuthSession = axum_login::AuthSession<AuthBackend>;
