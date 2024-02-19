@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use crate::error_template::{AppError, ErrorTemplate};
 use leptos::*;
 use leptos_meta::*;
@@ -39,37 +37,139 @@ pub fn App() -> impl IntoView {
     }
 }
 
+#[server]
+async fn get_username() -> Result<Option<String>, ServerFnError> {
+    use crate::auth::AuthSession;
+    Ok(expect_context::<AuthSession>().user.map(|u| u.username))
+}
+
+#[server]
+async fn logout() -> Result<(), ServerFnError> {
+    use crate::auth::AuthSession;
+
+    match expect_context::<AuthSession>().logout().await {
+        Ok(_) => Ok(()),
+        Err(e) => Err(ServerFnError::from(e)),
+    }
+}
+
 /// Renders the home page of your application.
 #[component]
 fn HomePage() -> impl IntoView {
+    let username = create_blocking_resource(|| (), |_| async { get_username().await });
+
+    // TODO: Not sure how to do error handling
+    let reload_or = move |_| {
+        spawn_local(async {
+            if logout().await.is_ok() {
+                let _ = window().location().reload();
+            }
+        })
+    };
+
     view! {
         <h1>"Welcome!"</h1>
 
-        <A href="/login"> "Login" </A>
-        <br />
-        <A href="/signup"> "Sign Up" </A>
+
+            <Suspense fallback=||()>
+        { move || {
+            username.with(|username|{
+                match username {
+                    // TODO: Add log out button
+                    Some(Ok(Some(username))) => view! {
+                        <p>
+                            "Logged in as " {username}". "
+                            <button on:click=reload_or >Log out</button>
+                        </p> }.into_view(),
+                    Some(Ok(None)) => view! {
+
+                            <A href="/login"> "Login" </A>
+                                <br />
+                                <A href="/signup"> "Sign Up" </A>
+                        }.into_view(),
+                    Some(Err(err)) => view!{<p>{err.to_string()}</p>}.into_view(),
+                    None => ().into_view(),
+                }
+            })
+        }}
+        </Suspense>
 
         <p>Wanna visit the secret page?</p>
         <A href="/secret">Click here</A>
     }
 }
 
+#[server(LogInDetails)]
+async fn log_in(username: String, password: String) -> Result<(), ServerFnError> {
+    use crate::auth::{AuthSession, Credentials};
+
+    // Don't sign up if we're already logged in
+    let mut session: AuthSession = expect_context();
+    if session.user.is_some() {
+        leptos_axum::redirect("/");
+        return Ok(());
+    }
+
+    let user = session.authenticate(Credentials { username, password }).await?;
+
+    if let Some(user) = user {
+        session.login(&user).await?;
+        Ok(())
+    } else {
+        Err(ServerFnError::ServerError("Invalid login details".to_owned()))
+    }
+}
+
 #[component]
 fn LogIn() -> impl IntoView {
+    let log_in_action = create_server_action::<LogInDetails>();
+    let pending = log_in_action.pending();
+    let ret = log_in_action.value();
+
+    // TODO: Force https
+
     view! {
-        <h1>"Welcome user!"</h1>
-        <p>You are logged in!</p>
+        <h1>"Sign Up"</h1>
+        <p>"We definitely "<em>"won't"</em>" sell your data"</p>
+
+        <ActionForm class="credential-form" action=log_in_action>
+                <label for="username">Username </label>
+                <input type="text" name="username"/>
+
+                <label for="password">Password </label>
+                <input type="password" name="password"/>
+
+            <input type="submit" value="Sign Up"/>
+        </ActionForm>
+
+
+        <p>{move || pending.get().then_some("Working... 🛌")}</p>
+        <p>
+            {move || {
+                if let Some(Err(v)) = ret.get() {
+                    view! { {v.to_string()} }.into_view()
+                } else {
+                    ().into_view()
+                }
+            }}
+        </p>
+        // <p>{move || ret.get().and_then(|res| res.is_err().then_some(res.err().unwrap().to_string()))}</p>
     }
 }
 
 #[server(SignUpDetails)]
 async fn sign_up(username: String, password: String) -> Result<(), ServerFnError> {
     use crate::auth;
-    use rand::random;
-    use crate::auth::Credentials;
+    use crate::auth::{AuthSession, Credentials};
     use crate::state::AppState;
     use bcrypt::hash_with_salt;
 
+    // Don't sign up if we're already logged in
+    let mut session: AuthSession = expect_context();
+    if session.user.is_some() {
+        leptos_axum::redirect("/");
+        return Ok(());
+    }
 
     /* // Mess with timing attacks
     tokio::time::sleep(Duration::from_nanos(
@@ -100,25 +200,29 @@ async fn sign_up(username: String, password: String) -> Result<(), ServerFnError
 
     let pw_hash = hash_with_salt(password, auth::BCRYPT_COST, rand::random()).unwrap();
 
-    println!("Received {username:?}, {pw_hash:?}");
-    println!("{:?}", pw_hash.to_string());
+    println!("Registering {username:?}");
 
-    println!("Registering {username:?}, {pw_hash:?}");
-
-    sqlx::query("INSERT INTO user (username, password_hash, salt) VALUES (?, ?, ?)")
-        .bind(username)
+    // NOTE: We don't need to store the hash.. It's in the bcrypt hash.. Should be parsing the
+    // bcrypt hash to generate it from login ig.
+    sqlx::query("INSERT INTO user (username, password_hash) VALUES (?, ?)")
+        .bind(&username)
         .bind(pw_hash.to_string())
-        .bind(pw_hash.get_salt())
-        .execute(&state.pool).await?;
+        .execute(&state.pool)
+        .await?;
 
-    // TODO: Figure out how to.. log the user in lmao
+    let res = session
+        .authenticate(Credentials {
+            username,
+            password,
+        })
+        .await?
+        .expect("user should authenticate correctly because they were just added to the database");
 
-    // let auth = state.auth.authenticate(Credentials {
-    //     username,
-    //     pw_hash: pw_hash.to_string(),
-    // });
+    println!("{:?}", res);
 
-    // leptos_axum::redirect("/");
+    session.login(&res).await?;
+
+    leptos_axum::redirect("/");
     Ok(())
 }
 
@@ -128,6 +232,8 @@ fn SignUp() -> impl IntoView {
     let pending = sign_up_action.pending();
     let ret = sign_up_action.value();
 
+    // TODO: Force https
+    // TODO: Inform the user that passwords are truncated at 72 chars.
     view! {
         <h1>"Sign Up"</h1>
         <p>"We definitely "<em>"won't"</em>" sell your data"</p>

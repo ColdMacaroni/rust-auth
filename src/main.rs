@@ -6,6 +6,7 @@ use axum::Router;
 use leptos::*;
 use leptos_axum::{generate_route_list, handle_server_fns_with_context, LeptosRoutes};
 use rust_auth::app::*;
+use rust_auth::auth::AuthSession;
 use rust_auth::fileserv::file_and_error_handler;
 use rust_auth::state::*;
 use std::path::Path;
@@ -18,7 +19,10 @@ async fn main() {
     // let addr = leptos_options.site_addr;
 
     use axum::routing::get;
-    use axum_login::{tower_sessions::SessionManagerLayer, AuthManagerLayerBuilder};
+    use axum_login::{
+        tower_sessions::{SessionManagerLayer, SessionStore},
+        AuthManagerLayerBuilder,
+    };
     use leptos::server_fn::axum::server_fn_paths;
     use std::process::exit;
     use tower_sessions_sqlx_store::SqliteStore;
@@ -33,12 +37,19 @@ async fn main() {
         }
     };
 
-
-    sqlx::migrate!().run(&state.pool).await.expect("Migrations to run correctly");
+    sqlx::migrate!()
+        .run(&state.pool)
+        .await
+        .expect("Migrations to run correctly");
 
     // The session needs a place to store the user cookies and such
     // Pool is behind an Arc so ok to clone
+    // let session_store = SqliteStore::new(state.pool.clone());
     let session_store = SqliteStore::new(state.pool.clone());
+
+    if let Err(err) = session_store.migrate().await {
+        panic!("failed to create tower-sessions table: {}", err);
+    }
 
     // Requests get passed through this layer, pressumably to ensure they've got the cookies and
     // stuff.
@@ -73,6 +84,7 @@ async fn main() {
 /// Axum handler to use context in server functions
 async fn server_fn_handler(
     State(state): State<AppState>,
+    auth_session: AuthSession,
     path: AxumPath<String>,
     request: Request<AxumBody>,
 ) -> impl IntoResponse {
@@ -80,16 +92,30 @@ async fn server_fn_handler(
     // Should i be just passing the whole thing? like maybe not,, but server funcs might want to
     // refer to the config on stuff yk? /shrug
     // Ok to clone so much ?? Put in Arc maybe ??
-    handle_server_fns_with_context(move || provide_context(state.clone()), request).await
+    handle_server_fns_with_context(
+        move || {
+            provide_context(state.clone());
+            provide_context(auth_session.clone())
+        },
+        request,
+    )
+    .await
 }
 
 /// The same context needs to be available for both the server function and the leptos route
 /// handler.
-async fn leptos_routes_handler(State(state): State<AppState>, request: Request<AxumBody>) -> Response {
+async fn leptos_routes_handler(
+    State(state): State<AppState>,
+    auth_session: AuthSession,
+    request: Request<AxumBody>,
+) -> Response {
     let handler = leptos_axum::render_route_with_context(
         state.config.leptos.clone(),
         generate_route_list(App),
-        move || provide_context(state.clone()),
+        move || {
+            provide_context(state.clone());
+            provide_context(auth_session.clone())
+        },
         App,
     );
     handler(request).await.into_response()

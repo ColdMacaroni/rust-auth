@@ -1,5 +1,5 @@
 [database]
-url = "sqlite::memory:"
+url = "sqlite:/tmp/rust-auth.db"
 
 [leptos]
 output-name = "rust-auth"

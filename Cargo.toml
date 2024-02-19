@@ -33,6 +33,7 @@ axum-login = "0.13.1"
 tower-sessions-sqlx-store = { version = "0.10.0", features = ["mysql", "sqlite"], optional = true }
 bcrypt = { version = "0.15.0", optional = true}
 rand = { version = "0.8.5", optional = true }
+base64 = { version = "0.21.7", optional = true }
 
 [features]
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
@@ -41,6 +42,7 @@ hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
 ssr = [
     "dep:axum",
     "dep:bcrypt",
+    "dep:base64",
     "dep:tokio",
     "dep:tower",
     "dep:tower-http",
@@ -56,6 +58,7 @@ ssr = [
     "dep:tracing",
 ]
 rand = ["dep:rand"]
+base64 = ["dep:base64"]
 
 # Defines a size-optimized profile for the WASM bundle in release mode
 [profile.wasm-release]
