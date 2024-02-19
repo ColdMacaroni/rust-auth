@@ -2,9 +2,8 @@ use axum::async_trait;
 use axum_login::UserId;
 use axum_login::{AuthUser, AuthnBackend};
 use sqlx::prelude::FromRow;
-use sqlx::{Row, SqlitePool};
+use sqlx::SqlitePool;
 use std::fmt::Debug;
-use thiserror::Error;
 
 pub const BCRYPT_COST: u32 = 12;
 
@@ -86,31 +85,31 @@ impl AuthnBackend for AuthBackend {
         &self,
         creds: Self::Credentials,
     ) -> Result<Option<Self::User>, Self::Error> {
-        // let Some(user): Option<User> = sqlx::query_as("SELECT * FROM user WHERE username = ?")
-        //     .bind(creds.username)
-        //     .fetch_optional(&self.pool)
-        //     .await?
-        // else {
-        //     return Ok(None);
-        // };
-        //
-        // // Idfk how to do error types ok
-        // if bcrypt::verify(creds.password, &user.pw_hash)
-        //     .expect("database's hash should be formatted ok")
-        // {
-        //     Ok(Some(user))
-        // } else {
-        //     Ok(None)
-        // }
+        let Some(user): Option<User> = sqlx::query_as("SELECT * FROM user WHERE username = ?")
+            .bind(creds.username)
+            .fetch_optional(&self.pool)
+            .await?
+        else {
+            return Ok(None);
+        };
+
+        // Idfk how to do error types ok
+        if bcrypt::verify(creds.password, &user.pw_hash)
+            .expect("database's hash should be formatted ok")
+        {
+            Ok(Some(user))
+        } else {
+            Ok(None)
+        }
 
 
-        dbg!(
-            sqlx::query_as("SELECT * FROM user WHERE username = ? AND password_hash = ?")
-                .bind(creds.username)
-                .bind(creds.pw_hash)
-                .fetch_optional(&self.pool)
-                .await
-        )
+        // dbg!(
+        //     sqlx::query_as("SELECT * FROM user WHERE username = ? AND password_hash = ?")
+        //         .bind(creds.username)
+        //         .bind(creds.password)
+        //         .fetch_optional(&self.pool)
+        //         .await
+        // )
     }
 
     async fn get_user(&self, user_id: &UserId<Self>) -> Result<Option<Self::User>, Self::Error> {

@@ -27,10 +27,12 @@ pub fn App() -> impl IntoView {
         }>
             <main>
                 <Routes>
-                    <Route path="/" view=HomePage/>
+                    // This mode makes it so suspenses with blocking resources are forced to render
+                    // on the server
+                    <Route ssr=SsrMode::PartiallyBlocked path="/" view=HomePage/>
                     <Route path="/login" view=LogIn/>
                     <Route path="/signup" view=SignUp/>
-                    <Route path="/secret" view=Secret/>
+                    <Route ssr=SsrMode::PartiallyBlocked path="/secret" view=Secret/>
                 </Routes>
             </main>
         </Router>
@@ -110,13 +112,18 @@ async fn log_in(username: String, password: String) -> Result<(), ServerFnError>
         return Ok(());
     }
 
-    let user = session.authenticate(Credentials { username, password }).await?;
+    let user = session
+        .authenticate(Credentials { username, password })
+        .await?;
 
     if let Some(user) = user {
         session.login(&user).await?;
+        leptos_axum::redirect("/");
         Ok(())
     } else {
-        Err(ServerFnError::ServerError("Invalid login details".to_owned()))
+        Err(ServerFnError::ServerError(
+            "Invalid login details".to_owned(),
+        ))
     }
 }
 
@@ -129,8 +136,8 @@ fn LogIn() -> impl IntoView {
     // TODO: Force https
 
     view! {
-        <h1>"Sign Up"</h1>
-        <p>"We definitely "<em>"won't"</em>" sell your data"</p>
+        <h1>"Log In"</h1>
+        <p>"Welcome back "<del>"product"</del>" beloved user :)"</p>
 
         <ActionForm class="credential-form" action=log_in_action>
                 <label for="username">Username </label>
@@ -139,7 +146,7 @@ fn LogIn() -> impl IntoView {
                 <label for="password">Password </label>
                 <input type="password" name="password"/>
 
-            <input type="submit" value="Sign Up"/>
+            <input type="submit" value="Log In"/>
         </ActionForm>
 
 
@@ -162,7 +169,7 @@ async fn sign_up(username: String, password: String) -> Result<(), ServerFnError
     use crate::auth;
     use crate::auth::{AuthSession, Credentials};
     use crate::state::AppState;
-    use bcrypt::hash_with_salt;
+    use bcrypt::hash;
 
     // Don't sign up if we're already logged in
     let mut session: AuthSession = expect_context();
@@ -198,7 +205,7 @@ async fn sign_up(username: String, password: String) -> Result<(), ServerFnError
         return Err(ServerFnError::ServerError("User already exists".to_owned()));
     }
 
-    let pw_hash = hash_with_salt(password, auth::BCRYPT_COST, rand::random()).unwrap();
+    let pw_hash = hash(&password, auth::BCRYPT_COST).expect("password should hash correctly.");
 
     println!("Registering {username:?}");
 
@@ -211,14 +218,9 @@ async fn sign_up(username: String, password: String) -> Result<(), ServerFnError
         .await?;
 
     let res = session
-        .authenticate(Credentials {
-            username,
-            password,
-        })
+        .authenticate(Credentials { username, password })
         .await?
         .expect("user should authenticate correctly because they were just added to the database");
-
-    println!("{:?}", res);
 
     session.login(&res).await?;
 
@@ -266,8 +268,27 @@ fn SignUp() -> impl IntoView {
 /// Renders the SEECRET
 #[component]
 fn Secret() -> impl IntoView {
+    let username = create_blocking_resource(|| (), |_| async { get_username().await });
+
     view! {
-        <h1>"Welcome user!"</h1>
-        <p>You are logged in!</p>
+        <Suspense fallback=||()>
+        {username.with(|n|
+                   if let Some(Ok(Some(name))) = n {
+                       view! {
+                           <h1>"heyy " {name} </h1>
+                           <p>this is just for you</p>
+                           <img src="celebrate.png" />
+                           <br />
+                       }
+
+                   } else {
+
+                       view! {
+                           <h1>Ermmm</h1>
+                           <p>"Sorry you're not allowed to look at this.."</p>
+                       }
+                   })}
+        </Suspense>
+        <A href="/"> Back to homepage </A>
     }
 }
